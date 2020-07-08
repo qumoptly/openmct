@@ -21,70 +21,27 @@
  *****************************************************************************/
 
 define([
-    "./src/NotificationIndicatorController",
-    "./src/NotificationIndicator",
-    "./src/NotificationService",
-    "text!./res/notification-indicator.html",
-    'legacyRegistry'
+    "./src/NotificationService"
 ], function (
-    NotificationIndicatorController,
-    NotificationIndicator,
-    NotificationService,
-    notificationIndicatorTemplate,
-    legacyRegistry
+    NotificationService
 ) {
 
-    legacyRegistry.register("platform/commonUI/notification", {
-        "extensions": {
-            "constants": [
-                {
-                    "key": "DEFAULT_AUTO_DISMISS",
-                    "value": 3000
-                },
-                {
-                    "key": "FORCE_AUTO_DISMISS",
-                    "value": 1000
-                },
-                {
-                    "key": "MINIMIZE_TIMEOUT",
-                    "value": 300
-                }
-            ],
-            "templates": [
-                {
-                    "key": "notificationIndicatorTemplate",
-                    "template": notificationIndicatorTemplate
-                }
-            ],
-            "controllers": [
-                {
-                    "key": "NotificationIndicatorController",
-                    "implementation": NotificationIndicatorController,
-                    "depends": [
-                        "$scope",
-                        "notificationService",
-                        "dialogService"
-                    ]
-                }
-            ],
-            "indicators": [
-                {
-                    "implementation": NotificationIndicator,
-                    "priority": "fallback"
-                }
-            ],
-            "services": [
-                {
-                    "key": "notificationService",
-                    "implementation": NotificationService,
-                    "depends": [
-                        "$timeout",
-                        "topic",
-                        "DEFAULT_AUTO_DISMISS",
-                        "MINIMIZE_TIMEOUT"
-                    ]
-                }
-            ]
+    return {
+        name:"platform/commonUI/notification",
+        definition: {
+            "extensions": {
+                "services": [
+                    {
+                        "key": "notificationService",
+                        "implementation": function (openmct) {
+                            return new NotificationService.default(openmct);
+                        },
+                        "depends": [
+                            "openmct"
+                        ]
+                    }
+                ]
+            }
         }
-    });
+    };
 });

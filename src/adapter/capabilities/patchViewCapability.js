@@ -31,6 +31,7 @@ define([
             var capability = viewConstructor(domainObject);
             var oldInvoke = capability.invoke.bind(capability);
 
+            /* eslint-disable you-dont-need-lodash-underscore/map */
             capability.invoke = function () {
                 var availableViews = oldInvoke();
                 var newDomainObject = capability
@@ -48,10 +49,12 @@ define([
                     }
                     return vd;
                 })
-                .sortBy('priority')
-                .map('view')
-                .value();
+                    .sortBy('priority')
+                    .map('view')
+                    .value();
             };
+            /* eslint-enable you-dont-need-lodash-underscore/map */
+
             return capability;
         };
     }

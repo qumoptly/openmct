@@ -21,7 +21,7 @@
  *****************************************************************************/
 
 define([
-    '../../api/objects/object-utils'
+    'objectUtils'
 ], function (
     objectUtils
 ) {
@@ -60,8 +60,8 @@ define([
             }, this);
 
         return Promise.all(promises).then(function () {
-                return results;
-            });
+            return results;
+        });
     };
 
     /**
@@ -72,8 +72,8 @@ define([
         return this.modelService.getModels(ids)
             .then(function (models) {
                 var missingIds = ids.filter(function (id) {
-                        return !models[id];
-                    });
+                    return !models[id];
+                });
 
                 if (!missingIds.length) {
                     return models;

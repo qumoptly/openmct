@@ -21,91 +21,80 @@
  *****************************************************************************/
 
 /*global module,process*/
-module.exports = function(config) {
-    config.set({
 
-        // Base path that will be used to resolve all file patterns.
-        basePath: '',
+const devMode = process.env.NODE_ENV !== 'production';
+const browsers = [process.env.NODE_ENV === 'debug' ? 'ChromeDebugging' : 'ChromeHeadless'];
+const coverageEnabled = process.env.COVERAGE === 'true';
+const reporters = ['progress', 'html'];
 
-        // Frameworks to use
-        // Available frameworks: https://npmjs.org/browse/keyword/karma-adapter
-        frameworks: ['jasmine', 'requirejs'],
+if (coverageEnabled) {
+    reporters.push('coverage-istanbul');
+}
 
-        // List of files / patterns to load in the browser.
-        // By default, files are also included in a script tag.
-        files: [
-            {pattern: 'bower_components/**/*.js', included: false},
-            {pattern: 'node_modules/d3-*/**/*.js', included: false},
-            {pattern: 'node_modules/vue/**/*.js', included: false},
-            {pattern: 'node_modules/printj/dist/*.js', included: false},
-            {pattern: 'src/**/*', included: false},
-            {pattern: 'node_modules/painterro/build/*.js', included: false},
-            {pattern: 'node_modules/html2canvas/dist/*', included: false},
-            {pattern: 'example/**/*.html', included: false},
-            {pattern: 'example/**/*.js', included: false},
-            {pattern: 'example/**/*.json', included: false},
-            {pattern: 'platform/**/*.js', included: false},
-            {pattern: 'warp/**/*.js', included: false},
-            {pattern: 'platform/**/*.html', included: false},
-            'test-main.js'
-        ],
+module.exports = (config) => {
+    const webpackConfig = require('./webpack.config.js');
+    delete webpackConfig.output;
 
-        // List of files to exclude.
-        exclude: [
-            'platform/framework/src/Main.js'
-        ],
-
-        // Preprocess matching files before serving them to the browser.
-        // https://npmjs.org/browse/keyword/karma-preprocessor
-        preprocessors: {
-            'src/**/!(*Spec).js': [ 'coverage' ],
-            'platform/**/src/**/!(*Spec).js': [ 'coverage' ]
-        },
-
-        // Test results reporter to use
-        // Possible values: 'dots', 'progress'
-        // Available reporters: https://npmjs.org/browse/keyword/karma-reporter
-        reporters: ['progress', 'coverage', 'html'],
-
-        // Web server port.
-        port: 9876,
-
-        // Wnable / disable colors in the output (reporters and logs).
-        colors: true,
-
-        logLevel: config.LOG_INFO,
-
-        // Rerun tests when any file changes.
-        autoWatch: true,
-
-        // Specify browsers to run tests in.
-        // available browser launchers: https://npmjs.org/browse/keyword/karma-launcher
-        browsers: [
-            'ChromeHeadless'
-        ],
-
-        // Code coverage reporting.
-        coverageReporter: {
-            dir: process.env.CIRCLE_ARTIFACTS ?
-                process.env.CIRCLE_ARTIFACTS + '/coverage' :
-                "dist/reports/coverage",
-            check: {
-                global: {
-                    lines: 80,
-                    excludes: ['src/plugins/plot/**/*.js']
+    if (!devMode || coverageEnabled) {
+        webpackConfig.module.rules.push({
+            test: /\.js$/,
+            exclude: /node_modules|example|lib|dist/,
+            use: {
+                loader: 'istanbul-instrumenter-loader',
+                options: {
+                    esModules: true
                 }
             }
-        },
+        });
+    }
 
+    config.set({
+        basePath: '',
+        frameworks: ['jasmine'],
+        files: [
+            'platform/**/*Spec.js',
+            'src/**/*Spec.js'
+        ],
+        port: 9876,
+        reporters: reporters,
+        browsers: browsers,
+        customLaunchers: {
+            ChromeDebugging: {
+                base: 'Chrome',
+                flags: ['--remote-debugging-port=9222'],
+                debug: true
+            }
+        },
+        colors: true,
+        logLevel: config.LOG_INFO,
+        autoWatch: true,
         // HTML test reporting.
         htmlReporter: {
             outputDir: "dist/reports/tests",
             preserveDescribeNesting: true,
             foldAll: false
         },
-
-        // Continuous Integration mode.
-        // If true, Karma captures browsers, runs the tests and exits.
+        coverageIstanbulReporter: {
+            fixWebpackSourcePaths: true,
+            dir: process.env.CIRCLE_ARTIFACTS ?
+                process.env.CIRCLE_ARTIFACTS + '/coverage' :
+                "dist/reports/coverage",
+            reports: ['html', 'lcovonly', 'text-summary'],
+            thresholds: {
+                global: {
+                    lines: 62
+                }
+            }
+        },
+        preprocessors: {
+            'platform/**/*Spec.js': ['webpack', 'sourcemap'],
+            'src/**/*Spec.js': ['webpack', 'sourcemap']
+        },
+        webpack: webpackConfig,
+        webpackMiddleware: {
+            stats: 'errors-only',
+            logLevel: 'warn'
+        },
         singleRun: true
     });
-};
+}

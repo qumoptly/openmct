@@ -44,7 +44,7 @@ define([
     function CompositionAPI(publicAPI) {
         this.registry = [];
         this.policies = [];
-        this.addProvider(new DefaultCompositionProvider(publicAPI));
+        this.addProvider(new DefaultCompositionProvider(publicAPI, this));
         this.publicAPI = publicAPI;
     }
 
@@ -70,7 +70,7 @@ define([
      * @memberof module:openmct.CompositionAPI#
      */
     CompositionAPI.prototype.get = function (domainObject) {
-        var provider = _.find(this.registry, function (p) {
+        var provider = this.registry.find(p => {
             return p.appliesTo(domainObject);
         });
 

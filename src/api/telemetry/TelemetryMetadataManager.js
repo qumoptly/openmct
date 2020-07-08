@@ -57,13 +57,13 @@ define([
 
         if (valueMetadata.format === 'enum') {
             if (!valueMetadata.values) {
-                valueMetadata.values = _.pluck(valueMetadata.enumerations, 'value');
+                valueMetadata.values = valueMetadata.enumerations.map(e => e.value);
             }
             if (!valueMetadata.hasOwnProperty('max')) {
-                valueMetadata.max = _.max(valueMetadata.values) + 1;
+                valueMetadata.max = Math.max(valueMetadata.values) + 1;
             }
             if (!valueMetadata.hasOwnProperty('min')) {
-                valueMetadata.min = _.min(valueMetadata.values) - 1;
+                valueMetadata.min = Math.min(valueMetadata.values) - 1;
             }
         }
 
@@ -81,7 +81,7 @@ define([
     function TelemetryMetadataManager(metadata) {
         this.metadata = metadata;
 
-        this.valueMetadatas = this.metadata.values.map(applyReasonableDefaults);
+        this.valueMetadatas = this.metadata.values ? this.metadata.values.map(applyReasonableDefaults) : [];
     }
 
     /**
@@ -116,12 +116,32 @@ define([
             return hints.every(hasHint, metadata);
         }
         var matchingMetadata = this.valueMetadatas.filter(hasHints);
-        var sortedMetadata = _.sortBy(matchingMetadata, function (metadata) {
-            return hints.map(function (hint) {
+        let iteratees = hints.map(hint => {
+            return (metadata) => {
                 return metadata.hints[hint];
-            });
+            }
         });
-        return sortedMetadata;
+        return _.sortBy(matchingMetadata, ...iteratees);
+    };
+
+    TelemetryMetadataManager.prototype.getFilterableValues = function () {
+        return this.valueMetadatas.filter(metadatum => metadatum.filters && metadatum.filters.length > 0);
+    }
+
+    TelemetryMetadataManager.prototype.getDefaultDisplayValue = function () {
+        let valueMetadata = this.valuesForHints(['range'])[0];
+
+        if (valueMetadata === undefined) {
+            valueMetadata = this.values().filter(values => {
+                return !(values.hints.domain);
+            })[0];
+        }
+
+        if (valueMetadata === undefined) {
+            valueMetadata = this.values()[0];
+        }
+
+        return valueMetadata.key;
     };
 
 

@@ -84,6 +84,7 @@ define([
             this.listenTo(this, 'change:xKey', this.onXKeyChange, this);
             this.listenTo(this, 'change:yKey', this.onYKeyChange, this);
             this.persistedConfig = options.persistedConfig;
+            this.filters = options.filters;
 
             Model.apply(this, arguments);
             this.onXKeyChange(this.get('xKey'));
@@ -139,16 +140,27 @@ define([
          * @returns {Promise}
          */
         fetch: function (options) {
-            options = _.extend({}, {size: 1000, strategy: 'minmax'}, options || {});
+            let strategy;
+
+            if (this.model.interpolate !== 'none') {
+                strategy = 'minmax';
+            }
+
+            options = Object.assign({}, { size: 1000, strategy, filters: this.filters }, options || {});
+
             if (!this.unsubscribe) {
                 this.unsubscribe = this.openmct
                     .telemetry
                     .subscribe(
                         this.domainObject,
-                        this.add.bind(this)
+                        this.add.bind(this),
+                        {
+                            filters: this.filters
+                        }
                     );
             }
 
+            /* eslint-disable you-dont-need-lodash-underscore/concat */
             return this.openmct
                 .telemetry
                 .request(this.domainObject, options)
@@ -156,10 +168,11 @@ define([
                     var newPoints = _(this.data)
                         .concat(points)
                         .sortBy(this.getXVal)
-                        .uniq(true, this.getXVal)
+                        .uniq(true, point => [this.getXVal(point), this.getYVal(point)].join())
                         .value();
                     this.reset(newPoints);
                 }.bind(this));
+            /* eslint-enable you-dont-need-lodash-underscore/concat */
         },
         /**
          * Update x formatter on x change.
@@ -259,7 +272,7 @@ define([
          * @private
          */
         sortedIndex: function (point) {
-            return _.sortedIndex(this.data, point, this.getXVal);
+            return _.sortedIndexBy(this.data, point, this.getXVal);
         },
         /**
          * Update min/max stats for the series.
@@ -311,7 +324,15 @@ define([
          *                  a point to the end without dupe checking.
          */
         add: function (point, appendOnly) {
-            var insertIndex = this.data.length;
+            var insertIndex = this.data.length,
+                currentYVal = this.getYVal(point),
+                lastYVal = this.getYVal(this.data[insertIndex - 1]);
+
+            if (this.isValueInvalid(currentYVal) && this.isValueInvalid(lastYVal)) {
+                console.warn('[Plot] Invalid Y Values detected');
+                return;
+            }
+
             if (!appendOnly) {
                 insertIndex = this.sortedIndex(point);
                 if (this.getXVal(this.data[insertIndex]) === this.getXVal(point)) {
@@ -321,11 +342,21 @@ define([
                     return;
                 }
             }
+
             this.updateStats(point);
             point.mctLimitState = this.evaluate(point);
             this.data.splice(insertIndex, 0, point);
             this.emit('add', point, insertIndex, this);
         },
+
+        /**
+         *
+         * @private
+         */
+        isValueInvalid: function (val) {
+            return Number.isNaN(val) || val === undefined;
+        },
+
         /**
          * Remove a point from the data array and notify listeners.
          * @private
@@ -360,6 +391,25 @@ define([
                 }
             }
 
+        },
+        /**
+         * Updates filters, clears the plot series, unsubscribes and resubscribes
+         * @public
+         */
+        updateFiltersAndRefresh: function (updatedFilters) {
+            let deepCopiedFilters = JSON.parse(JSON.stringify(updatedFilters));
+
+            if (this.filters && !_.isEqual(this.filters, deepCopiedFilters)) {
+                this.filters = deepCopiedFilters;
+                this.reset();
+                if (this.unsubscribe) {
+                    this.unsubscribe();
+                    delete this.unsubscribe;
+                }
+                this.fetch();
+            } else {
+                this.filters = deepCopiedFilters;
+            }
         }
     });
 

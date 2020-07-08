@@ -25,20 +25,10 @@ define([
 
     function ConfigStore() {
         this.store = {};
-        this.tracking = {};
     }
 
-    ConfigStore.prototype.track = function (id) {
-        if (!this.tracking[id]) {
-            this.tracking[id] = 0;
-        }
-        this.tracking[id] += 1;
-    };
-
-    ConfigStore.prototype.untrack = function (id) {
-        this.tracking[id] -= 1;
-        if (this.tracking[id] <= 0) {
-            delete this.tracking[id];
+    ConfigStore.prototype.deleteStore = function (id) {
+        if (this.store[id]) {
             this.store[id].destroy();
             delete this.store[id];
         }

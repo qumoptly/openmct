@@ -20,10 +20,9 @@
  * at runtime from the About dialog for additional information.
  *****************************************************************************/
 
-/*global window,requirejs*/
+/*global window*/
 
 define([
-    'require',
     './Constants',
     './FrameworkInitializer',
     './LogLevel',
@@ -31,13 +30,11 @@ define([
     './resolve/ImplementationLoader',
     './resolve/ExtensionResolver',
     './resolve/BundleResolver',
-    './resolve/RequireConfigurator',
     './register/CustomRegistrars',
     './register/ExtensionRegistrar',
     './register/ExtensionSorter',
     './bootstrap/ApplicationBootstrapper'
 ], function (
-    require,
     Constants,
     FrameworkInitializer,
     LogLevel,
@@ -45,7 +42,6 @@ define([
     ImplementationLoader,
     ExtensionResolver,
     BundleResolver,
-    RequireConfigurator,
     CustomRegistrars,
     ExtensionRegistrar,
     ExtensionSorter,
@@ -59,19 +55,18 @@ define([
 
     FrameworkLayer.prototype.initializeApplication = function (
         angular,
-        legacyRegistry,
+        openmct,
         logLevel
     ) {
         var $http = this.$http,
             $log = this.$log,
             app = angular.module(Constants.MODULE_NAME, ["ngRoute"]),
-            loader = new BundleLoader($http, $log, legacyRegistry),
+            loader = new BundleLoader($http, $log, openmct.legacyRegistry),
             resolver = new BundleResolver(
                 new ExtensionResolver(
-                    new ImplementationLoader(require),
+                    new ImplementationLoader({}),
                     $log
                 ),
-                new RequireConfigurator(requirejs),
                 $log
             ),
             registrar = new ExtensionRegistrar(
@@ -82,7 +77,7 @@ define([
             ),
             bootstrapper = new ApplicationBootstrapper(
                 angular,
-                window.document,
+                openmct.element,
                 $log
             ),
             initializer = new FrameworkInitializer(
@@ -92,13 +87,18 @@ define([
                 bootstrapper
             );
 
+        // Override of angular1.6 ! hashPrefix
+        app.config(['$locationProvider', function ($locationProvider) {
+            $locationProvider.hashPrefix('');
+        }]);
+
         // Apply logging levels; this must be done now, before the
         // first log statement.
         new LogLevel(logLevel).configure(app, $log);
 
         // Initialize the application
         $log.info("Initializing application.");
-        initializer.runApplication();
+        return initializer.runApplication();
     };
 
     return FrameworkLayer;

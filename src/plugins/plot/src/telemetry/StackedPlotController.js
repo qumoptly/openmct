@@ -20,15 +20,9 @@
  * at runtime from the About dialog for additional information.
  *****************************************************************************/
 
-define([
-    'lodash'
-], function (
-    _
-) {
-
+define([], function () {
     function StackedPlotController($scope, openmct, objectService, $element, exportImageService) {
         var tickWidth = 0,
-            newFormatObject,
             composition,
             currentRequest,
             unlisten,
@@ -36,17 +30,10 @@ define([
 
         this.$element = $element;
         this.exportImageService = exportImageService;
+        this.$scope = $scope;
+        this.cursorGuide = false;
 
         $scope.telemetryObjects = [];
-
-        function oldId(newIdentifier) {
-            var idParts = [];
-            if (newIdentifier.namespace) {
-                idParts.push(newIdentifier.namespace.replace(/\:/g, '\\:'));
-            }
-            idParts.push(newIdentifier.key);
-            return idParts.join(':');
-        }
 
         function onDomainObjectChange(domainObject) {
             var thisRequest = {
@@ -64,7 +51,7 @@ define([
             }
 
             function addChild(child) {
-                var id = oldId(child.identifier);
+                var id = openmct.objects.makeKeyString(child.identifier);
                 thisTickWidthMap[id] = 0;
                 thisRequest.pending += 1;
                 objectService.getObjects([id])
@@ -76,7 +63,7 @@ define([
             }
 
             function removeChild(childIdentifier) {
-                var id = oldId(childIdentifier);
+                var id = openmct.objects.makeKeyString(childIdentifier);
                 delete thisTickWidthMap[id];
                 var childObj = telemetryObjects.filter(function (c) {
                     return c.getId() === id;
@@ -84,26 +71,36 @@ define([
                 if (childObj) {
                     var index = telemetryObjects.indexOf(childObj);
                     telemetryObjects.splice(index, 1);
-                    $scope.$broadcast('plot:tickWidth', _.max(tickWidthMap));
+                    $scope.$broadcast('plot:tickWidth', Math.max(...Object.values(tickWidthMap)));
                 }
             }
+
+            function compositionReorder(reorderPlan) {
+                let oldComposition = telemetryObjects.slice();
+
+                reorderPlan.forEach((reorder) => {
+                    telemetryObjects[reorder.newIndex] = oldComposition[reorder.oldIndex];
+                });
+            }
+
             thisRequest.pending += 1;
             openmct.objects.get(domainObject.getId())
-                    .then(function (obj) {
-                        thisRequest.pending -= 1;
-                        if (thisRequest !== currentRequest) {
-                            return;
-                        }
-                        newFormatObject = obj;
-                        composition = openmct.composition.get(obj);
-                        composition.on('add', addChild);
-                        composition.on('remove', removeChild);
-                        composition.load();
-                        unlisten = function () {
-                            composition.off('add', addChild);
-                            composition.off('remove', removeChild);
-                        };
-                    });
+                .then(function (obj) {
+                    thisRequest.pending -= 1;
+                    if (thisRequest !== currentRequest) {
+                        return;
+                    }
+                    composition = openmct.composition.get(obj);
+                    composition.on('add', addChild);
+                    composition.on('remove', removeChild);
+                    composition.on('reorder', compositionReorder);
+                    composition.load();
+                    unlisten = function () {
+                        composition.off('add', addChild);
+                        composition.off('remove', removeChild);
+                        composition.off('reorder', compositionReorder);
+                    };
+                });
         }
 
         function onCompositionChange(newComp, oldComp) {
@@ -123,12 +120,13 @@ define([
         $scope.$watch('domainObject.getModel().composition', onCompositionChange);
 
         $scope.$on('plot:tickWidth', function ($e, width) {
-            var plotId = $e.targetScope.domainObject.getId();
+            const plotId = $e.targetScope.domainObject.getId();
             if (!tickWidthMap.hasOwnProperty(plotId)) {
                 return;
             }
+
             tickWidthMap[plotId] = Math.max(width, tickWidthMap[plotId]);
-            var newTickWidth = _.max(tickWidthMap);
+            const newTickWidth = Math.max(...Object.values(tickWidthMap));
             if (newTickWidth !== tickWidth || width !== tickWidth) {
                 tickWidth = newTickWidth;
                 $scope.$broadcast('plot:tickWidth', tickWidth);
@@ -154,6 +152,11 @@ define([
             .finally(function () {
                 this.hideExportButtons = false;
             }.bind(this));
+    };
+
+    StackedPlotController.prototype.toggleCursorGuide = function ($event) {
+        this.cursorGuide = !this.cursorGuide;
+        this.$scope.$broadcast('cursorguide', $event);
     };
 
     return StackedPlotController;
